@@ -457,20 +457,25 @@ private final class SpriteTomatoView: NSView {
             return
         }
 
-        let index = frameIndex(progress: state.progress, running: state.isRunning)
-        let target = bounds.insetBy(dx: 0, dy: 0)
+        let progress = CGFloat(min(1.0, max(0.0, state.progress)))
+        let index = frameIndex(progress: progress)
+
+        let bounce: CGFloat = state.isRunning ? -abs(sin(animationPhase * .pi / 4)) * 14 : 0
+        let target = bounds.offsetBy(dx: 0, dy: bounce)
+
         draw(redFrames[index], in: target)
 
-        if index < greenFrames.count && state.progress > 0 {
-            let alpha = CGFloat(min(1.0, max(0.0, state.progress)))
-            greenFrames[index].draw(
-                in: target,
-                from: NSRect(x: 0, y: 0, width: greenFrames[index].size.width, height: greenFrames[index].size.height),
-                operation: .sourceOver,
-                fraction: alpha,
-                respectFlipped: true,
-                hints: [.interpolation: NSImageInterpolation.high]
-            )
+        if index < greenFrames.count && progress > 0 {
+            NSGraphicsContext.saveGraphicsState()
+            let fillHeight = target.height * progress
+            NSBezierPath(rect: NSRect(
+                x: target.minX,
+                y: target.maxY - fillHeight,
+                width: target.width,
+                height: fillHeight
+            )).addClip()
+            draw(greenFrames[index], in: target)
+            NSGraphicsContext.restoreGraphicsState()
         }
     }
 
@@ -484,14 +489,10 @@ private final class SpriteTomatoView: NSView {
         }
     }
 
-    private func frameIndex(progress: CGFloat, running: Bool) -> Int {
+    private func frameIndex(progress: CGFloat) -> Int {
         let count = redFrames.count
         guard count > 1 else { return 0 }
-        if running {
-            return Int(animationPhase) % count
-        }
-        let clamped = min(1, max(0, progress))
-        return min(count - 1, Int(clamped * CGFloat(count)))
+        return min(count - 1, Int(progress * CGFloat(count)))
     }
 
     private func draw(_ image: NSImage, in target: NSRect) {
