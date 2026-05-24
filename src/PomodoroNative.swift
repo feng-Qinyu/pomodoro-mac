@@ -462,11 +462,15 @@ private final class SpriteTomatoView: NSView {
         draw(redFrames[index], in: target)
 
         if index < greenFrames.count && state.progress > 0 {
-            NSGraphicsContext.saveGraphicsState()
-            let fillHeight = target.height * min(1, max(0, state.progress))
-            NSBezierPath(rect: NSRect(x: target.minX, y: target.maxY - fillHeight, width: target.width, height: fillHeight)).addClip()
-            draw(greenFrames[index], in: target)
-            NSGraphicsContext.restoreGraphicsState()
+            let alpha = CGFloat(min(1.0, max(0.0, state.progress)))
+            greenFrames[index].draw(
+                in: target,
+                from: NSRect(x: 0, y: 0, width: greenFrames[index].size.width, height: greenFrames[index].size.height),
+                operation: .sourceOver,
+                fraction: alpha,
+                respectFlipped: true,
+                hints: [.interpolation: NSImageInterpolation.high]
+            )
         }
     }
 
@@ -483,15 +487,10 @@ private final class SpriteTomatoView: NSView {
     private func frameIndex(progress: CGFloat, running: Bool) -> Int {
         let count = redFrames.count
         guard count > 1 else { return 0 }
-        let clamped = min(1, max(0, progress))
         if running {
-            let base = min(count - 1, Int(clamped * CGFloat(count)))
-            let step = Int(animationPhase) % 2
-            if base >= count - 2 {
-                return min(count - 1, count - 2 + step)
-            }
-            return min(count - 1, base + step)
+            return Int(animationPhase) % count
         }
+        let clamped = min(1, max(0, progress))
         return min(count - 1, Int(clamped * CGFloat(count)))
     }
 
