@@ -520,7 +520,7 @@ private final class SpriteTomatoView: NSView {
 private final class PomodoroController: NSObject {
     private let state = TimerState()
     private let window: NSWindow
-    private let tomato = SpriteTomatoView(frame: NSRect(x: 10, y: 144, width: 460, height: 376))
+    private let tomato = TomatoView(frame: NSRect(x: 10, y: 144, width: 460, height: 376))
     private let focusModeButton = PillButton(title: "专注", normal: NSColor(calibratedWhite: 0.91, alpha: 1), active: NSColor(calibratedRed: 226 / 255, green: 67 / 255, blue: 51 / 255, alpha: 1))
     private let shortModeButton = PillButton(title: "短休", normal: NSColor(calibratedWhite: 0.91, alpha: 1), active: NSColor(calibratedRed: 73 / 255, green: 145 / 255, blue: 88 / 255, alpha: 1))
     private let longModeButton = PillButton(title: "长休", normal: NSColor(calibratedWhite: 0.91, alpha: 1), active: NSColor(calibratedRed: 73 / 255, green: 145 / 255, blue: 88 / 255, alpha: 1))
