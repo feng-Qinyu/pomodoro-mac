@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Build output
+output/
+*.app
+*.icns
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Xcode / Swift
+DerivedData/
+*.xcuserstate
+.build/
+
+# Temp
+tmp/
+*.tmp
