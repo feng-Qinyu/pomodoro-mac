@@ -20,6 +20,10 @@ python3 scripts/prepare_tomato_sprite.py \
   "output/番茄钟-logo.png" \
   "$RES_DIR/AppIcon.icns"
 
+# Static tomato images for the timer view (red base + green variant).
+cp "assets/tomato-static.png" "$RES_DIR/"
+cp "assets/tomato-static-green.png" "$RES_DIR/"
+
 swiftc src/PomodoroNative.swift \
   -framework AppKit \
   -framework UserNotifications \

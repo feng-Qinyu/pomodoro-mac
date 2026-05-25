@@ -422,26 +422,31 @@ private final class PillButton: NSButton {
     }
 }
 
-private final class SpriteTomatoView: NSView {
+private final class StaticTomatoView: NSView {
     var state: TimerState? {
         didSet { needsDisplay = true }
     }
-    var animationPhase: CGFloat = 0 {
-        didSet { needsDisplay = true }
-    }
 
-    private let redFrames: [NSImage]
-    private let greenFrames: [NSImage]
+    private let redImage: NSImage?
+    private let greenImage: NSImage?
+
+    // Vertical extent of the red body in the source image, normalized [0, 1] from top.
+    // Measured empirically from assets/tomato-static.png (red pixel bbox y=126..465 of 512).
+    // Fill grows from bodyBottomRatio upward; at progress = 1 it reaches bodyTopRatio,
+    // exactly covering the red body. The (already-green) leaves above and (transparent)
+    // areas below are unaffected.
+    private let bodyTopRatio: CGFloat = 0.2461
+    private let bodyBottomRatio: CGFloat = 0.9082
 
     override init(frame frameRect: NSRect) {
-        redFrames = SpriteTomatoView.loadFrames(suffix: "")
-        greenFrames = SpriteTomatoView.loadFrames(suffix: "_green")
+        redImage = StaticTomatoView.loadImage("tomato-static")
+        greenImage = StaticTomatoView.loadImage("tomato-static-green")
         super.init(frame: frameRect)
     }
 
     required init?(coder: NSCoder) {
-        redFrames = SpriteTomatoView.loadFrames(suffix: "")
-        greenFrames = SpriteTomatoView.loadFrames(suffix: "_green")
+        redImage = StaticTomatoView.loadImage("tomato-static")
+        greenImage = StaticTomatoView.loadImage("tomato-static-green")
         super.init(coder: coder)
     }
 
@@ -452,47 +457,52 @@ private final class SpriteTomatoView: NSView {
         NSColor(calibratedRed: 1.0, green: 0.973, blue: 0.945, alpha: 1).setFill()
         bounds.fill()
 
-        guard let state, !redFrames.isEmpty else {
+        guard let redImage else {
             drawFallback()
             return
         }
 
-        let progress = CGFloat(min(1.0, max(0.0, state.progress)))
-        let index = frameIndex(progress: progress)
+        let target = fittedRect(for: redImage)
+        draw(redImage, in: target)
 
-        let bounce: CGFloat = state.isRunning ? -abs(sin(animationPhase * .pi / 4)) * 14 : 0
-        let target = bounds.offsetBy(dx: 0, dy: bounce)
+        let progress = CGFloat(min(1.0, max(0.0, state?.progress ?? 0)))
+        if progress > 0, let greenImage {
+            let bodyTopY = target.minY + bodyTopRatio * target.height
+            let bodyBottomY = target.minY + bodyBottomRatio * target.height
+            let fillHeight = (bodyBottomY - bodyTopY) * progress
+            let fillTopY = bodyBottomY - fillHeight
 
-        draw(redFrames[index], in: target)
-
-        if index < greenFrames.count && progress > 0 {
             NSGraphicsContext.saveGraphicsState()
-            let fillHeight = target.height * progress
             NSBezierPath(rect: NSRect(
                 x: target.minX,
-                y: target.maxY - fillHeight,
+                y: fillTopY,
                 width: target.width,
                 height: fillHeight
             )).addClip()
-            draw(greenFrames[index], in: target)
+            draw(greenImage, in: target)
             NSGraphicsContext.restoreGraphicsState()
         }
     }
 
-    private static func loadFrames(suffix: String) -> [NSImage] {
-        (0..<8).compactMap { index in
-            Bundle.main.url(
-                forResource: String(format: "frame_%02d%@", index, suffix),
-                withExtension: "png",
-                subdirectory: "tomato_frames"
-            ).flatMap { NSImage(contentsOf: $0) }
+    private func fittedRect(for image: NSImage) -> NSRect {
+        let imageSize = image.size
+        guard imageSize.width > 0, imageSize.height > 0 else { return bounds }
+        let imageAspect = imageSize.width / imageSize.height
+        let viewAspect = bounds.width / bounds.height
+        if viewAspect > imageAspect {
+            let h = bounds.height
+            let w = h * imageAspect
+            return NSRect(x: bounds.midX - w / 2, y: bounds.minY, width: w, height: h)
+        } else {
+            let w = bounds.width
+            let h = w / imageAspect
+            return NSRect(x: bounds.minX, y: bounds.midY - h / 2, width: w, height: h)
         }
     }
 
-    private func frameIndex(progress: CGFloat) -> Int {
-        let count = redFrames.count
-        guard count > 1 else { return 0 }
-        return min(count - 1, Int(progress * CGFloat(count)))
+    private static func loadImage(_ name: String) -> NSImage? {
+        Bundle.main.url(forResource: name, withExtension: "png")
+            .flatMap { NSImage(contentsOf: $0) }
     }
 
     private func draw(_ image: NSImage, in target: NSRect) {
@@ -520,7 +530,7 @@ private final class SpriteTomatoView: NSView {
 private final class PomodoroController: NSObject {
     private let state = TimerState()
     private let window: NSWindow
-    private let tomato = TomatoView(frame: NSRect(x: 10, y: 144, width: 460, height: 376))
+    private let tomato = StaticTomatoView(frame: NSRect(x: 10, y: 144, width: 460, height: 376))
     private let focusModeButton = PillButton(title: "专注", normal: NSColor(calibratedWhite: 0.91, alpha: 1), active: NSColor(calibratedRed: 226 / 255, green: 67 / 255, blue: 51 / 255, alpha: 1))
     private let shortModeButton = PillButton(title: "短休", normal: NSColor(calibratedWhite: 0.91, alpha: 1), active: NSColor(calibratedRed: 73 / 255, green: 145 / 255, blue: 88 / 255, alpha: 1))
     private let longModeButton = PillButton(title: "长休", normal: NSColor(calibratedWhite: 0.91, alpha: 1), active: NSColor(calibratedRed: 73 / 255, green: 145 / 255, blue: 88 / 255, alpha: 1))
@@ -532,8 +542,6 @@ private final class PomodoroController: NSObject {
     private let pauseButton = PillButton(title: "暂停", normal: NSColor(calibratedRed: 251 / 255, green: 188 / 255, blue: 5 / 255, alpha: 0.94), active: NSColor(calibratedRed: 251 / 255, green: 188 / 255, blue: 5 / 255, alpha: 1))
     private let resetButton = PillButton(title: "重置", normal: NSColor(calibratedWhite: 0.88, alpha: 1), active: NSColor(calibratedWhite: 0.78, alpha: 1))
     private var timer: Timer?
-    private var animationTimer: Timer?
-    private var animationPhase: CGFloat = 0
 
     override init() {
         window = NSWindow(
@@ -634,19 +642,16 @@ private final class PomodoroController: NSObject {
     @objc private func start() {
         state.isRunning = true
         startTicking()
-        startAnimating()
         update()
     }
 
     @objc private func pause() {
         state.isRunning = false
-        stopAnimating()
         update()
     }
 
     @objc private func reset() {
         state.reset()
-        stopAnimating()
         update()
     }
 
@@ -698,7 +703,6 @@ private final class PomodoroController: NSObject {
             guard let self else { return }
             let completed = self.state.tick()
             if completed {
-                self.stopAnimating()
                 self.alertDone()
                 self.update()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
@@ -711,26 +715,8 @@ private final class PomodoroController: NSObject {
         }
     }
 
-    private func startAnimating() {
-        if animationTimer != nil { return }
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 14.0, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            if !self.state.isRunning {
-                self.stopAnimating()
-                return
-            }
-            self.animationPhase += 1
-            self.tomato.animationPhase = self.animationPhase
-        }
-    }
-
-    private func stopAnimating() {
-        animationTimer?.invalidate()
-        animationTimer = nil
-    }
-
     private func update() {
-        tomato.animationPhase = animationPhase
+        tomato.state = state
         tomato.needsDisplay = true
         timeLabel.stringValue = state.timeText
         statusLabel.stringValue = state.statusText
