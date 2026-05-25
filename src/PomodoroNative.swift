@@ -732,14 +732,31 @@ private final class PomodoroController: NSObject {
         resetButton.refresh()
     }
 
+    private static let alertSoundName = NSSound.Name("Glass")
+    private static let alertSoundFile = "Glass.aiff"
+    private static let alertRingCount = 3
+    private static let alertRingGap: TimeInterval = 0.7
+
     private func alertDone() {
-        NSSound.beep()
+        ringAlarm()
         let content = UNMutableNotificationContent()
         content.title = "番茄钟"
         content.body = "\(state.mode.title)时间到了"
-        content.sound = .default
+        content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.alertSoundFile))
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    private func ringAlarm() {
+        // Loud, repeated system bell to mimic an alarm clock ("ding-ding-ding") rather
+        // than the single quiet NSSound.beep().
+        for index in 0..<Self.alertRingCount {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * Self.alertRingGap) {
+                let sound = NSSound(named: Self.alertSoundName)
+                sound?.volume = 1.0
+                sound?.play()
+            }
+        }
     }
 
     private func requestNotifications() {
